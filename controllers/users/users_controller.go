@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"net/http"
+	"strconv"
 )
 
 func logError(err error) {
@@ -15,38 +16,37 @@ func logError(err error) {
 
 func CreateUser(c *gin.Context) {
 	var user users.User
-	//bytes, err := ioutil.ReadAll(c.Request.Body)
-	//fmt.Println(user)
-	//if err != nil {
-	//	logError(err)
-	//	return
-	//}
-	//if err := json.Unmarshal(bytes, &user); err != nil {
-	//	logError(err)
-	//	return
-	//}
 
 	if err := c.ShouldBindJSON(&user); err != nil {
 		logError(err)
-		restErr := errors.RestErr{
-			Message: "invalid json body",
-			Status:  http.StatusBadRequest,
-			Error:   "bad_request",
-		}
+		restErr := errors.NewBadRequestError("invalid json body")
 		c.JSON(restErr.Status, restErr)
 		return
 	}
 
 	result, saveErr := services.CreateUser(user)
 	if saveErr != nil {
-		logError(saveErr)
+		c.JSON(saveErr.Status, saveErr)
+		return
 	}
 	fmt.Println(result)
 	c.JSON(http.StatusCreated, result)
 }
 
 func GetUser(c *gin.Context) {
-	c.String(http.StatusNotImplemented, "implement me plz")
+	userId, userErr := strconv.ParseInt(c.Param("user_id"), 10, 64)
+	if userErr != nil {
+		err := errors.NewBadRequestError("user id should be a number")
+		c.JSON(err.Status, err)
+		return
+	}
+	user, getErr := services.GetUser(userId)
+	if getErr != nil {
+		err := errors.NewNotFoundError(fmt.Sprintf("user not found id: %d", userId))
+		c.JSON(err.Status, err)
+		return
+	}
+	c.JSON(http.StatusOK, user)
 }
 
 func SearchUser(c *gin.Context) {

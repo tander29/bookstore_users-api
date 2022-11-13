@@ -1,6 +1,8 @@
 package users
 
 import (
+	"bookstore_users-api/datasources/mysql/users_db"
+	"bookstore_users-api/utils/date_utils"
 	"bookstore_users-api/utils/errors"
 	"fmt"
 )
@@ -10,6 +12,9 @@ var (
 )
 
 func (u *User) Get() *errors.RestErr {
+	if err := users_db.Client.Ping(); err != nil {
+		panic(err)
+	}
 	result := usersDB[u.Id]
 	if result == nil {
 		return errors.NewNotFoundError(fmt.Sprintf("userId %d not found", u.Id))
@@ -31,7 +36,9 @@ func (u *User) Save() *errors.RestErr {
 		}
 		return errors.NewBadRequestError(fmt.Sprintf("user %d exists", u.Id))
 	}
-	// hmm feel like we should be using an ORM
+	now := date_utils.GetNowString()
+
+	u.DateCreated = now
 	usersDB[u.Id] = u
 	return nil
 }

@@ -5,6 +5,15 @@ import (
 	"bookstore_users-api/utils/date_utils"
 	"bookstore_users-api/utils/errors"
 	"fmt"
+	"strings"
+)
+
+// in this system data access object is only place used to access database
+const (
+	queryInsertUser  = "INSERT INTO users(first_name, last_name, email, date_created) VALUES(? , ?, ?, ?);"
+	queryGetUser     = "SELECT id, first_name, last_name, email, date_created FROM users WHERE id=?;"
+	indexUniqueEmail = "users.unique_email"
+	norows           = "no rows in result set"
 )
 
 var (
@@ -12,33 +21,44 @@ var (
 )
 
 func (u *User) Get() *errors.RestErr {
-	if err := users_db.Client.Ping(); err != nil {
-		panic(err)
+	stmt, err := users_db.Client.Prepare(queryGetUser)
+	if err != nil {
+		return errors.NewInternalServerError(err.Error())
 	}
-	result := usersDB[u.Id]
-	if result == nil {
-		return errors.NewNotFoundError(fmt.Sprintf("userId %d not found", u.Id))
+	defer stmt.Close()
+
+	result := stmt.QueryRow(u.Id)
+	if err := result.Scan(&u.Id, &u.FirstName, &u.LastName, &u.Email, &u.DateCreated); err != nil {
+		if strings.Contains(err.Error(), norows) {
+			return errors.NewNotFoundError(fmt.Sprintf("user %d not found", u.Id))
+		}
+		fmt.Println(err)
+		return errors.NewInternalServerError(fmt.Sprintf("error trying to get user %d, %s", u.Id, err.Error()))
 	}
-	// this seems dumb. why not use an ORM?
-	u.Id = result.Id
-	u.FirstName = result.FirstName
-	u.LastName = result.LastName
-	u.Email = result.Email
-	u.DateCreated = result.DateCreated
 	return nil
 }
 
 func (u *User) Save() *errors.RestErr {
-	current := usersDB[u.Id]
-	if current != nil {
-		if current.Email == u.Email {
+
+	stmt, err := users_db.Client.Prepare(queryInsertUser)
+	if err != nil {
+		return errors.NewInternalServerError(err.Error())
+	}
+	defer stmt.Close()
+	u.DateCreated = date_utils.GetNowString()
+
+	insertResult, err := stmt.Exec(u.FirstName, u.LastName, u.Email, u.DateCreated)
+	if err != nil {
+		if strings.Contains(err.Error(), indexUniqueEmail) {
 			return errors.NewBadRequestError(fmt.Sprintf("email %s already exists", u.Email))
 		}
-		return errors.NewBadRequestError(fmt.Sprintf("user %d exists", u.Id))
+		return errors.NewInternalServerError(fmt.Sprintf("error trying to save user %s", err.Error()))
 	}
-	now := date_utils.GetNowString()
+	userId, err := insertResult.LastInsertId()
+	if err != nil {
+		return errors.NewInternalServerError(fmt.Sprintf("error trying to save user %s", err.Error()))
+	}
+	u.Id = userId
 
-	u.DateCreated = now
-	usersDB[u.Id] = u
 	return nil
 }

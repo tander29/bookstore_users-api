@@ -5,6 +5,10 @@ golang-how-to-design-and-build-rest-microservices-in-go
 
 ### To Run App:
 
+need local db
+set up environment variables
+routes located at url_mappings
+
 #### Env Variables:
 
 Need to set env variables for Db connection: Check datasources/mysql for full list
@@ -18,7 +22,7 @@ mysql_users_host
 mysql_users_schema
 
 
-### Running MySql DB in Docker
+### Creating & Running MySql DB in Docker
 
 1. `docker pull mysql`
 2. create a mysql docker container and establish a host/port.  3306 is the default Mysql port within the docker container
